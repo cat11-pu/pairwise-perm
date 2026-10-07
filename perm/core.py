@@ -74,7 +74,7 @@ def _check_int(value, name):
 def total_count(items):
     """同一个多重集的全部不同排列条数。"""
     counts = _counts(items)
-    return _factorial(sum(counts.values()))
+    return _arrangements(counts, sum(counts.values()))
 
 
 def next_permutation(items):
@@ -89,7 +89,7 @@ def next_permutation(items):
     if pivot < 0:
         return None
     spot = len(seq) - 1
-    while seq[spot] < seq[pivot]:
+    while seq[spot] <= seq[pivot]:
         spot -= 1
     seq[pivot], seq[spot] = seq[spot], seq[pivot]
     seq[pivot + 1:] = reversed(seq[pivot + 1:])
@@ -108,6 +108,7 @@ def prev_permutation(items):
     while seq[spot] >= seq[pivot]:
         spot -= 1
     seq[pivot], seq[spot] = seq[spot], seq[pivot]
+    seq[pivot + 1:] = reversed(seq[pivot + 1:])
     return seq
 
 
@@ -116,7 +117,7 @@ def permutations(items):
     seq = list(items)
     counts = _counts(seq)
     out = []
-    _collect(sorted(seq), counts, [], len(seq), out)
+    _collect(sorted(counts), counts, [], len(seq), out)
     return out
 
 
@@ -141,23 +142,28 @@ def combinations(items, k):
     重复元素不会带来重复结果。
     """
     k = _check_int(k, "k")
-    seq = sorted(items)
-    size = len(seq)
+    counts = _counts(items)
+    size = sum(counts.values())
     if k > size:
         return []
+    keys = sorted(counts)
     out = []
-    spots = list(range(k))
-    while True:
-        combo = tuple(seq[spot] for spot in spots)
-        out.append(combo)
-        spot = k - 1
-        while spot >= 0 and spots[spot] == size - k + spot:
-            spot -= 1
-        if spot < 0:
-            break
-        spots[spot] += 1
-        for tail in range(spot + 1, k):
-            spots[tail] = spots[tail - 1] + 1
+
+    def build(index, remaining, prefix):
+        """按字典序把每个不同元素的取用数量组合追加到 out。"""
+        if remaining == 0:
+            out.append(tuple(prefix))
+            return
+        if index == len(keys):
+            return
+        key = keys[index]
+        upper = min(counts[key], remaining)
+        for used in range(upper, -1, -1):
+            prefix.extend([key] * used)
+            build(index + 1, remaining - used, prefix)
+            del prefix[len(prefix) - used:]
+
+    build(0, k, [])
     return out
 
 
@@ -185,6 +191,7 @@ def rank(items, arrangement):
                 continue
             counts[key] -= 1
             result += _arrangements(counts, len(target) - position - 1)
+            counts[key] += 1
         counts[item] -= 1
     return result
 
@@ -205,7 +212,7 @@ def unrank(items, index):
                 continue
             counts[key] -= 1
             block = _arrangements(counts, size - position - 1)
-            if index <= block:
+            if index < block:
                 out.append(key)
                 break
             index -= block
@@ -224,5 +231,5 @@ def take(items, start, count):
     total = total_count(seq)
     if start >= total:
         return []
-    limit = min(count, total)
+    limit = min(start + count, total)
     return [unrank(seq, index) for index in range(start, limit)]
